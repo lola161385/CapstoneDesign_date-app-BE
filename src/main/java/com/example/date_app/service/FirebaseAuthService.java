@@ -91,6 +91,12 @@ public class FirebaseAuthService {
         try {
             latch.await();
             Map<String, Object> profile = result[0];
+
+            // profileImage 필드가 누락된 경우, 기본 이미지로 설정
+            if (!profile.containsKey("profileImage")) {
+                profile.put("profileImage", "/images/default-profile.png");
+            }
+
             // 디폴트 키 처리
             if (!profile.containsKey("personality")) {
                 profile.put("personality", new HashMap<String, Object>());
@@ -194,4 +200,17 @@ public class FirebaseAuthService {
             throw new RuntimeException("전체 프로필 조회 중 인터럽트 발생", e);
         }
     }
+
+    public void updateProfileImageUrl(String email, String imageUrl) throws FirebaseAuthException {
+        UserRecord user = getUserByEmail(email);
+        String uid = user.getUid();
+
+        DatabaseReference ref = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(uid)
+                .child("profileImage");
+
+        ref.setValueAsync(imageUrl);
+    }
+
 }

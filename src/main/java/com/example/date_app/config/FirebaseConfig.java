@@ -22,11 +22,16 @@ public class FirebaseConfig {
             FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .setDatabaseUrl("https://date-app-41a1c-default-rtdb.firebaseio.com")
+                    .setStorageBucket("date-app-41a1c.firebasestorage.app")
                     .build();
 
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
                 System.out.println("✅ Firebase 초기화 완료");
+
+                System.out.println("▶ 현재 FirebaseApp 이름: " + FirebaseApp.getInstance().getName());
+                System.out.println("▶ 설정된 Storage 버킷: " + FirebaseApp.getInstance().getOptions().getStorageBucket());
+
             }
 
         } catch (Exception e) {

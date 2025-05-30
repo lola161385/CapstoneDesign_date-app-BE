@@ -2,6 +2,7 @@ package com.example.date_app.controller;
 
 import com.example.date_app.dto.ProfileUpdateRequest;
 import com.example.date_app.service.FirebaseAuthService;
+import com.example.date_app.service.FirebaseStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -9,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -18,6 +20,7 @@ import java.util.Map;
 public class ProfileController {
 
     private final FirebaseAuthService firebaseAuthService;
+    private final FirebaseStorageService firebaseStorageService;
 
     // [1] 프로필 조회 페이지 (기존 home.html → profile.html로 사용)
     @GetMapping("/profile")
@@ -30,6 +33,8 @@ public class ProfileController {
         try {
             Map<String, Object> profile = firebaseAuthService.getUserProfile(userEmail);
             if (profile != null) {
+                model.addAttribute("profileImage", profile.getOrDefault("profileImage", "/images/default-profile.png"));
+
                 model.addAttribute("name", profile.getOrDefault("name", ""));
                 model.addAttribute("birthdate", profile.getOrDefault("birthdate", ""));
                 model.addAttribute("bio", profile.getOrDefault("bio", ""));
@@ -102,4 +107,25 @@ public class ProfileController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return (auth != null) ? (String) auth.getPrincipal() : null;
     }
+
+    @PostMapping("/api/profile/upload-image")
+    @ResponseBody
+    public ResponseEntity<?> uploadProfileImage(@RequestParam("file") MultipartFile file) {
+        String email = getCurrentUserEmail();
+        if (email == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        try {
+            String userId = firebaseAuthService.getUserByEmail(email).getUid();
+            String imageUrl = firebaseStorageService.uploadProfileImage(file, userId);
+
+            // Storage URL을 Firebase DB에 저장
+            firebaseAuthService.updateProfileImageUrl(email, imageUrl);
+
+            return ResponseEntity.ok(Map.of("imageUrl", imageUrl));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("success", false, "message", "업로드 실패: " + e.getMessage()));
+        }
+    }
+
 }

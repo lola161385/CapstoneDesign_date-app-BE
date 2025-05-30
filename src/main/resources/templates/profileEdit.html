@@ -12,6 +12,10 @@
 
 <!-- 프로필 폼 -->
 <form id="profile-form" style="display:none;">
+    <input type="file" id="imageUpload" />
+    <img id="preview" src="/images/default-profile.png" width="100" height="100" alt="미리보기">
+
+    <br>
     <label>이름:
         <input type="text" id="name" name="name" required>
     </label><br>
@@ -62,6 +66,19 @@
         <textarea id="bio" name="bio" placeholder="AI가 생성한 자기소개가 여기에 표시됩니다." rows="5"></textarea><br>
     </label><br>
     <button type="button" id="save-all">전체 저장하기</button>
+<script>
+    document.getElementById('imageUpload').addEventListener('change', function (e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                document.getElementById('preview').src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+
 </form>
 
 <a href="/home">홈으로</a>
@@ -102,6 +119,15 @@
                 document.getElementById('profile-form').style.display = 'block';
                 const profile = data.profile || {};
                 const personality = profile.personality || {};
+
+                const imageUrl = profile.profileImage || profile.imageUrl;
+                console.log("✅ 로드된 이미지 URL:", imageUrl);
+
+                if (imageUrl) {
+                    document.getElementById('preview').src = imageUrl;
+                } else {
+                    document.getElementById('preview').src = '/images/default-profile.png';
+                }
 
                 document.getElementById('name').value = data.profile.name || '';
                 document.getElementById('gender').value = profile.gender || '';
@@ -204,25 +230,56 @@
         }
     });
 
-    document.getElementById('save-all').addEventListener('click', () => {
+    document.getElementById('save-all').addEventListener('click', async () => {
+        const fileInput = document.getElementById('imageUpload');
+        const file = fileInput.files[0];
+        let uploadedImageUrl = '';
+
+        // 1. 이미지 업로드 먼저
+        if (file) {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch("/api/profile/upload-image", {
+                    method: "POST",
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: formData
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || "업로드 실패");
+                uploadedImageUrl = data.imageUrl;
+            } catch (err) {
+                alert("❌ 이미지 업로드 실패: " + err.message);
+                return;
+            }
+        }
+
+        // 2. 나머지 프로필 정보 저장
         const name = document.getElementById('name').value;
         const gender = document.getElementById('gender').value;
         const birthdate = document.getElementById('birthdate').value;
         const bio = document.getElementById('bio').value;
         const mbti = document.getElementById('mbti').value;
-        const tags = Array.from(selectedTags); // 성격 태그 선택값
+        const tags = Array.from(selectedTags);
 
         const likeKeywordsInput = document.getElementById('like-keywords').value.trim();
         const likeKeywords = Array.from(new Set(likeKeywordsInput.split(',').map(keyword => keyword.trim()))).filter(keyword => keyword !== '');
 
-        if (likeKeywords.length > 5) {
-            alert("❌ 선호하는 키워드는 최대 5개까지만 입력할 수 있습니다.");
-            return;
-        }
-
         if (!name || !gender || !birthdate || !mbti) {
             alert("이름, 성별, 생년월일, MBTI는 필수입니다.");
             return;
+        }
+
+        const profileData = {
+            name, gender, birthdate, bio, mbti, tags, likeTags: likeKeywords
+        };
+
+        // 이미지 업로드한 경우만 포함
+        if (uploadedImageUrl) {
+            profileData.imageUrl = uploadedImageUrl;
         }
 
         fetch('/api/profile/update', {
@@ -231,14 +288,12 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token
             },
-            body: JSON.stringify({ name, gender, birthdate, bio, mbti, tags, likeTags: likeKeywords })
+            body: JSON.stringify(profileData)
         })
             .then(response => response.text())
             .then(msg => {
-                showToast(msg); // 성공 메시지 표시
-                setTimeout(() => {
-                    window.location.href = "/profile"; // 1.5초 후 페이지 이동
-                }, 1500);
+                showToast(msg);
+                setTimeout(() => window.location.href = "/profile", 1500);
             })
             .catch(err => alert('❌ 저장 실패: ' + err.message));
     });
@@ -261,6 +316,41 @@
                 });
         });
     });
+
+    function uploadImage() {
+        const fileInput = document.getElementById('imageUpload');
+        const file = fileInput.files[0];
+        if (!file) return alert("파일을 선택해주세요");
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        fetch("/api/profile/upload-image", {
+            method: "POST",
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem("jwtToken")
+            },
+            body: formData
+        })
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || data.error || "이미지 업로드 실패");
+                }
+
+                if (data.imageUrl) {
+                    document.getElementById("preview").src = data.imageUrl;
+                    alert("✅ 이미지 업로드 성공!");
+                } else {
+                    throw new Error("이미지 URL이 응답에 없습니다.");
+                }
+            })
+            .catch(err => {
+                console.error("❌ 업로드 실패:", err);
+                alert("❌ 업로드 실패: " + err.message);
+            });
+
+    }
 </script>
 
 <style>

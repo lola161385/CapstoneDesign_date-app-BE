@@ -13,7 +13,8 @@ public class ProfileUpdateRequest {
     private String gender;
     private String mbti;
     private List<String> tags;
-    private List<String> likeTags; // ✅ 추가된 필드 (선호 태그)
+    private List<String> likeTags;
+    private String profileImageUrl;
 
     public boolean isValid() {
         return tags != null && tags.size() <= 5 && (likeTags == null || likeTags.size() <= 5);

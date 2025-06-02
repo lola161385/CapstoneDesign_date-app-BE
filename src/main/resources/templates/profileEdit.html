@@ -13,7 +13,12 @@
 <!-- 프로필 폼 -->
 <form id="profile-form" style="display:none;">
     <input type="file" id="imageUpload" />
-    <img id="preview" src="/images/default-profile.png" width="100" height="100" alt="미리보기">
+
+    <img id="preview" src="/images/default-profile.png"
+         width="100" height="100" alt="미리보기"
+         style="cursor: pointer;"
+         onclick="document.getElementById('imageUpload').click()">
+
 
     <br>
     <label>이름:
@@ -180,6 +185,18 @@
         const bioField = document.getElementById('bio'); // 결과를 표시할 텍스트 영역
         const mbti = document.getElementById('mbti').value; // MBTI 입력값
 
+        const profileImageUrl = document.getElementById('preview').src;
+
+        if (!profileImageUrl || profileImageUrl.includes('/images/default-profile.png')) {
+            alert('프로필 이미지를 먼저 업로드해주세요.');
+            return;
+        }
+
+        if (profileImageUrl.startsWith('data:')) {
+            alert('이미지를 서버에 먼저 업로드해주세요.');
+            return;
+        }
+
         // 선호 키워드를 콤마로 나누고 중복 제거
         const likeKeywords = Array.from(new Set(likeKeywordsInput.split(',').map(keyword => keyword.trim())));
 
@@ -211,9 +228,10 @@
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    keywords: keywords, // 본인 태그
-                    mbti: [mbti], // MBTI
-                    likeKeyWords: validLikeKeywords, // 선호하는 키워드
+                    keywords: keywords,
+                    mbti: [mbti],
+                    likeKeyWords: validLikeKeywords,
+                    profileImageUrl: profileImageUrl
                 }),
             });
 

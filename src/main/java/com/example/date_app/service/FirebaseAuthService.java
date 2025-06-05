@@ -15,6 +15,11 @@ import java.util.Map;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.Storage;
+import com.google.firebase.cloud.StorageClient;
+
+
 @Service
 public class FirebaseAuthService {
 
@@ -211,6 +216,86 @@ public class FirebaseAuthService {
                 .child("profileImage");
 
         ref.setValueAsync(imageUrl);
+    }
+
+    public void deleteUserData(String email) throws FirebaseAuthException {
+        UserRecord user = getUserByEmail(email);
+        String uid = user.getUid();
+
+        DatabaseReference ref = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(uid);
+        ref.removeValueAsync(); // DB에서 사용자 프로필 삭제
+    }
+
+    public void deleteUserProfileImage(String userId) {
+        Storage storage = StorageClient.getInstance().bucket().getStorage();
+        String objectName = "profileImages/" + userId;
+
+        BlobId blobId = BlobId.of(StorageClient.getInstance().bucket().getName(), objectName);
+        storage.delete(blobId); // Firebase Storage에서 이미지 삭제
+    }
+
+    public void deleteAllUserData(String email) throws FirebaseAuthException {
+        UserRecord user = getUserByEmail(email);
+        String uid = user.getUid();
+
+        deleteUserData(email);                          // Firebase DB 삭제
+        deleteUserProfileImage(uid);                    // Firebase Storage 이미지 삭제
+        deleteChatRoomsContainingUser(email);           // 채팅 삭제
+        deleteChatListEntries(email);                   // 채팅목록 삭제
+        FirebaseAuth.getInstance().deleteUser(uid);     // Firebase Auth 계정 삭제
+    }
+
+    public void deleteChatRoomsContainingUser(String email) {
+        String safeEmail = email.replace(".", "_dot_").replace("@", "_at_");
+
+        DatabaseReference chatsRef = FirebaseDatabase.getInstance().getReference("chats");
+
+        chatsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                for (DataSnapshot chatRoom : snapshot.getChildren()) {
+                    String roomId = chatRoom.getKey();
+                    if (roomId != null && roomId.contains(safeEmail)) {
+                        chatsRef.child(roomId).removeValueAsync();
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                System.out.println("채팅 삭제 실패: " + error.getMessage());
+            }
+        });
+    }
+
+    public void deleteChatListEntries(String email) {
+        String safeEmail = email.replace(".", "_dot_").replace("@", "_at_");
+
+        DatabaseReference chatListRef = FirebaseDatabase.getInstance().getReference("chat_list");
+
+        // 1. 자신의 chat_list 항목 삭제
+        chatListRef.child(safeEmail).removeValueAsync();
+
+        // 2. 다른 사람들의 chat_list에서 이 유저가 포함된 항목 삭제
+        chatListRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                for (DataSnapshot userEntry : snapshot.getChildren()) {
+                    String otherUser = userEntry.getKey();
+                    if (otherUser == null) continue;
+
+                    // /chat_list/otherUser/safeEmail 삭제
+                    chatListRef.child(otherUser).child(safeEmail).removeValueAsync();
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                System.out.println("chat_list 정리 실패: " + error.getMessage());
+            }
+        });
     }
 
 }

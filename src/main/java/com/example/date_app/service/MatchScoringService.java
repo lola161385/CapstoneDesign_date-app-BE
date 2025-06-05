@@ -1,6 +1,7 @@
 package com.example.date_app.service;
 
 import com.example.date_app.dto.MatchRecommendation;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -10,8 +11,11 @@ import java.util.stream.Collectors;
 
 import static java.util.Map.entry;
 
+@RequiredArgsConstructor
 @Service
 public class MatchScoringService {
+
+    private final FirebaseAuthService firebaseAuthService;
 
     private static final Map<String, Map<String, Integer>> mbtiCompatibility = Map.ofEntries(
             entry("INFP", Map.ofEntries(
@@ -128,20 +132,31 @@ public class MatchScoringService {
 
         int score = 0;
 
+        // mbti 궁합 점수
         if (mbtiCompatibility.containsKey(myMbti)) {
             score += mbtiCompatibility.get(myMbti).getOrDefault(theirMbti, 0);
         }
 
-        List<String> commonTags = myTags.stream()
+        // likeTags 추출 및 점수 반영
+        List<String> myLikeTags = List.of(); // 기본값
+        try {
+            Map<String, Object> myProfile = firebaseAuthService.getUserProfile(myEmail);
+            Map<String, Object> myPersonality = (Map<String, Object>) myProfile.getOrDefault("personality", Map.of());
+            myLikeTags = (List<String>) myPersonality.getOrDefault("likeTags", List.of());
+        } catch (Exception e) {
+            System.out.println("likeTags 불러오기 실패: " + e.getMessage());
+        }
+
+        List<String> likedTagsMatched = myLikeTags.stream()
                 .filter(theirTags::contains)
                 .collect(Collectors.toList());
-        score += commonTags.size();
+        score += likedTagsMatched.size();
+
 
         return new MatchRecommendation(
                 (String) targetProfile.get("email"),
                 (String) targetProfile.getOrDefault("name", "익명"),
                 theirMbti,
-                commonTags,
                 score
         );
     }

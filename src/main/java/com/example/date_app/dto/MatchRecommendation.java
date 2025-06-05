@@ -11,6 +11,5 @@ public class MatchRecommendation {
     private String email;
     private String name;
     private String mbti;
-    private List<String> commonTags;
     private int score;
 }

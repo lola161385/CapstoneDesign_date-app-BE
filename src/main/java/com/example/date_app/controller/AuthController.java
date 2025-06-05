@@ -123,7 +123,7 @@ public class AuthController {
         }
 
         try {
-            firebaseAuthService.deleteUserByEmail(userEmail);
+            firebaseAuthService.deleteAllUserData(userEmail);
             return "redirect:/login";
         } catch (FirebaseAuthException e) {
             model.addAttribute("message", "회원탈퇴 실패: " + e.getMessage());

@@ -29,10 +29,12 @@ jobs:
           echo "${{ secrets.FIREBASE_JSON }}" | base64 -d > backend/src/main/resources/firebase-service-account.json
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ./backend/gradlew
+        run: chmod +x gradlew
+        working-directory: ./backend
 
       - name: Build with Gradle
-        run: ./backend/gradlew clean build
+        run: ./gradlew clean build
+        working-directory: ./backend
 
       # 2. app.jar + JSON 복사 (필요시)
       - name: Deploy JAR and config
